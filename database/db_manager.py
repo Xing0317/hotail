@@ -25,43 +25,6 @@ class DatabaseManager:
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         
-        # 初始化数据库表
-        self.init_db()
-
-    def init_db(self):
-        cursor = self.conn.cursor()
-        
-        # 创建房间表
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS rooms (
-            room_number TEXT PRIMARY KEY,
-            room_type TEXT NOT NULL,
-            price REAL NOT NULL,
-            status TEXT DEFAULT 'available'
-        )
-        ''')
-        
-        # 创建入住记录表
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS check_ins (
-            check_in_id INTEGER PRIMARY KEY,
-            guest_name TEXT,
-            phone TEXT,
-            id_card TEXT,
-            room_number TEXT,
-            room_type TEXT,
-            price_per_unit REAL,
-            duration INTEGER,
-            total_price REAL,
-            check_in_time TIMESTAMP,
-            check_out_time TIMESTAMP,
-            actual_check_out_time TIMESTAMP,
-            deposit_returned BOOLEAN DEFAULT 0,
-            FOREIGN KEY (room_number) REFERENCES rooms (room_number)
-        )
-        ''')
-        
-        self.conn.commit()
 
     def close(self):
         """关闭数据库连接"""
