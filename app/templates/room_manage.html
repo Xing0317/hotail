@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>房间管理</h3>
+        <button class="btn btn-primary" onclick="showAddRoom()">添加房间</button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>房间号</th>
+                        <th>类型</th>
+                        <th>价格</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for room in rooms %}
+                    <tr>
+                        <td>{{ room.room_number }}</td>
+                        <td>{{ '按天' if room.room_type == 'daily' else '按小时' }}</td>
+                        <td>¥{{ room.price }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-success' if room.status == 'available' else 'bg-danger' }}">
+                                {{ '可用' if room.status == 'available' else '已占用' }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editRoom('{{ room.room_number }}')">编辑</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 添加/编辑房间模态框 -->
+<div class="modal fade" id="roomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">添加房间</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="roomForm">
+                    <div class="mb-3">
+                        <label class="form-label">房间号</label>
+                        <input type="text" class="form-control" name="room_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">类型</label>
+                        <select class="form-select" name="room_type" required>
+                            <option value="daily">按天</option>
+                            <option value="hourly">按小时</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">价格</label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input type="number" class="form-control" name="price" required min="0" step="0.01">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveRoom()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let editingRoom = null;
+const roomModal = new bootstrap.Modal(document.getElementById('roomModal'));
+
+function showAddRoom() {
+    editingRoom = null;
+    document.getElementById('modalTitle').textContent = '添加房间';
+    document.getElementById('roomForm').reset();
+    document.querySelector('input[name="room_number"]').removeAttribute('readonly');
+    roomModal.show();
+}
+
+function editRoom(roomNumber) {
+    editingRoom = roomNumber;
+    fetch(`/api/rooms/${roomNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const room = data.data;
+                document.querySelector('input[name="room_number"]').value = room.room_number;
+                document.querySelector('select[name="room_type"]').value = room.room_type;
+                document.querySelector('input[name="price"]').value = room.price;
+                
+                document.getElementById('modalTitle').textContent = '编辑房间';
+                document.querySelector('input[name="room_number"]').setAttribute('readonly', true);
+                roomModal.show();
+            } else {
+                alert('获取房间信息失败：' + data.error);
+            }
+        });
+}
+
+function saveRoom() {
+    const formData = {
+        room_number: document.querySelector('input[name="room_number"]').value,
+        room_type: document.querySelector('select[name="room_type"]').value,
+        price: parseFloat(document.querySelector('input[name="price"]').value)
+    };
+
+    if (!formData.room_number || !formData.room_type || isNaN(formData.price)) {
+        alert('请填写所有必要信息');
+        return;
+    }
+
+    const url = editingRoom ? `/api/rooms/${editingRoom}` : '/api/rooms';
+    const method = editingRoom ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            roomModal.hide();
+            window.location.reload();
+        } else {
+            alert('操作失败：' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('系统错误：' + error);
+    });
+}
+</script>
+{% endblock %} 

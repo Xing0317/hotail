@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#records">入住记录</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#statistics">统计数据</a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        <div class="tab-content">
+            <!-- 入住记录 Tab -->
+            <div class="tab-pane fade show active" id="records">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" id="searchName" placeholder="客人姓名">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" id="searchPhone" placeholder="手机号">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" id="searchRoom" placeholder="房间号">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" onclick="searchRecords()">搜索</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>房间号</th>
+                                <th>客人姓名</th>
+                                <th>手机号</th>
+                                <th>身份证号</th>
+                                <th>入住时间</th>
+                                <th>预计退房时间</th>
+                                <th>实际退房时间</th>
+                                <th>费用</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchResults">
+                        </tbody>
+                    </table>
+                    <nav>
+                        <ul class="pagination justify-content-center" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- 统计数据 Tab -->
+            <div class="tab-pane fade" id="statistics">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <input type="date" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary" onclick="loadStatistics()">查询</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>收入统计</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>入住率统计</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="occupancyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- 添加 Chart.js 和 moment.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+<script>
+let revenueChart = null;
+let occupancyChart = null;
+
+function loadStatistics() {
+    const startDate = moment(document.getElementById('startDate').value).startOf('day');
+    const endDate = moment(document.getElementById('endDate').value).endOf('day');
+
+    // 加载收入统计
+    fetch(`/api/statistics/revenue?start_date=${startDate.format('YYYY-MM-DD HH:mm:ss')}&end_date=${endDate.format('YYYY-MM-DD HH:mm:ss')}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateRevenueChart(data.data);
+            }
+        });
+
+    // 加载入住率统计
+    fetch(`/api/statistics/occupancy?start_date=${startDate.format('YYYY-MM-DD HH:mm:ss')}&end_date=${endDate.format('YYYY-MM-DD HH:mm:ss')}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateOccupancyChart(data.data);
+            }
+        });
+}
+
+function updateRevenueChart(data) {
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    
+    if (revenueChart) {
+        revenueChart.destroy();
+    }
+
+    revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => moment(item.check_in_date).format('MM-DD')),
+            datasets: [{
+                label: '收入',
+                data: data.map(item => parseFloat(item.total_revenue || 0)),
+                borderColor: '#36a2eb',
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'category',
+                    title: {
+                        display: true,
+                        text: '日期'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '收入（元）'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return moment(context[0].label, 'MM-DD').format('YYYY-MM-DD');
+                        },
+                        label: function(context) {
+                            return [
+                                `收入: ¥${context.raw}`,
+                                `订单数: ${data[context.dataIndex].total_check_ins || 0}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateOccupancyChart(data) {
+    const ctx = document.getElementById('occupancyChart').getContext('2d');
+    
+    if (occupancyChart) {
+        occupancyChart.destroy();
+    }
+
+    occupancyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => moment(item.date).format('MM-DD')),
+            datasets: [{
+                label: '入住率',
+                data: data.map(item => ({
+                    y: item.occupancy_rate,
+                    occupied: item.occupied_rooms,
+                    total: item.total_rooms
+                })),
+                borderColor: '#4bc0c0',
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'category',
+                    title: {
+                        display: true,
+                        text: '日期'
+                    }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: '入住率（%）'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const data = context.raw;
+                            return [
+                                `入住率: ${data.y}%`,
+                                `已住房间: ${data.occupied}`,
+                                `总房间数: ${data.total}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 格式化显示脱敏信息
+function maskInfo(info, type) {
+    if (type === 'phone') {
+        return info.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    } else if (type === 'idcard') {
+        return info.replace(/(\d{6})\d{8}(\d{4})/, '$1********$2');
+    }
+    return info;
+}
+
+// 显示完整信息
+function showFullInfo(element, info) {
+    if (element.textContent === info) {
+        element.textContent = maskInfo(info, element.dataset.type);
+    } else {
+        element.textContent = info;
+    }
+}
+
+let currentPage = 1;
+const pageSize = 10;
+
+function updatePagination(total) {
+    const totalPages = Math.ceil(total / pageSize);
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+
+    // 添加页码按钮
+    for (let i = 1; i <= totalPages; i++) {
+        pagination.innerHTML += `
+            <li class="page-item ${currentPage === i ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+            </li>
+        `;
+    }
+}
+
+function changePage(page) {
+    currentPage = page;
+    searchRecords();
+}
+
+function searchRecords() {
+    const name = document.getElementById('searchName').value;
+    const phone = document.getElementById('searchPhone').value;
+    const room = document.getElementById('searchRoom').value;
+
+    fetch(`/api/check-in/search?name=${name}&phone=${phone}&room=${room}&page=${currentPage}&size=${pageSize}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateSearchResults(data.data.records);
+                updatePagination(data.data.total);
+            }
+        });
+}
+
+function updateSearchResults(records) {
+    const tbody = document.getElementById('searchResults');
+    tbody.innerHTML = '';
+
+    records.forEach(record => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${record.room_number}</td>
+            <td>${record.guest_name}</td>
+            <td class="clickable" onclick="showFullInfo(this, '${record.phone}')" data-type="phone">
+                ${maskInfo(record.phone, 'phone')}
+            </td>
+            <td class="clickable" onclick="showFullInfo(this, '${record.id_card}')" data-type="idcard">
+                ${maskInfo(record.id_card, 'idcard')}
+            </td>
+            <td>${record.check_in_time}</td>
+            <td>${record.check_out_time}</td>
+            <td>${record.actual_check_out_time || '-'}</td>
+            <td>¥${record.total_price}</td>
+            <td>
+                <span class="badge ${record.actual_check_out_time ? 'bg-secondary' : 'bg-primary'}">
+                    ${record.actual_check_out_time ? '已退房' : '在住'}
+                </span>
+            </td>
+            <td>
+                ${record.actual_check_out_time ? '' : 
+                `<button class="btn btn-sm btn-warning" onclick="checkOut('${record.check_in_id}')">
+                    退房
+                </button>`}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function checkOut(checkInId) {
+    if (!confirm('确认办理退房？')) {
+        return;
+    }
+
+    fetch(`/api/check-in/${checkInId}/check-out`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('退房成功！');
+            searchRecords();
+        } else {
+            alert('退房失败：' + data.error);
+        }
+    });
+}
+
+// 页面加载时设置默认时间范围
+document.addEventListener('DOMContentLoaded', function() {
+    const endDate = moment();
+    const startDate = moment().subtract(10, 'days');
+    
+    document.getElementById('startDate').value = startDate.format('YYYY-MM-DD');
+    document.getElementById('endDate').value = endDate.format('YYYY-MM-DD');
+    
+    loadStatistics();
+    searchRecords();
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>入住登记</h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">客人姓名</label>
+                <input type="text" class="form-control" name="guest_name" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">手机号码</label>
+                <input type="tel" class="form-control" name="phone" required pattern="[0-9]{11}">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">身份证号</label>
+                <input type="text" class="form-control" name="id_card" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">房间号</label>
+                <select class="form-select" name="room_number" required>
+                    <option value="">请选择房间</option>
+                    {% for room in rooms %}
+                    <option value="{{ room.room_number }}" 
+                            data-type="{{ room.room_type }}"
+                            data-price="{{ room.price }}">
+                        {{ room.room_number }} ({{ '按天' if room.room_type == 'daily' else '按小时' }} - ¥{{ room.price }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">入住时长</label>
+                <div class="input-group">
+                    <input type="number" class="form-control" name="duration" required min="1" value="1">
+                    <span class="input-group-text" id="durationUnit">单位(天/小时)</span>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">费用</label>
+                <div class="input-group">
+                    <span class="input-group-text">¥</span>
+                    <input type="number" class="form-control" name="total_price" step="0.01">
+                </div>
+            </div>
+        </div>
+        <input type="hidden" name="room_type">
+        <input type="hidden" name="price">
+        <button type="button" class="btn btn-primary" onclick="submitCheckIn()">提交入住</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script>
+let formData = {};
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', function() {
+    // 监听房间选择变化
+    document.querySelector('select[name="room_number"]').addEventListener('change', updateRoomInfo);
+    // 监听时长变化
+    document.querySelector('input[name="duration"]').addEventListener('input', calculatePrice);
+});
+
+// 更新房间信息
+function updateRoomInfo() {
+    const select = document.querySelector('select[name="room_number"]');
+    const option = select.options[select.selectedIndex];
+    const roomType = option.dataset.type;
+    const price = option.dataset.price;
+    
+    document.querySelector('input[name="room_type"]').value = roomType;
+    document.querySelector('input[name="price"]').value = price;
+    document.getElementById('durationUnit').textContent = roomType === 'hourly' ? '小时' : '天';
+    
+    calculatePrice();
+}
+
+// 计算价格
+function calculatePrice() {
+    const price = document.querySelector('input[name="price"]').value;
+    const duration = document.querySelector('input[name="duration"]').value;
+    if (price && duration) {
+        const total = (parseFloat(price) * parseInt(duration)).toFixed(2);
+        document.querySelector('input[name="total_price"]').value = total;
+    }
+}
+
+// 提交入住信息
+function submitCheckIn() {
+    // 收集表单数据
+    const formData = {
+        guest_name: document.querySelector('input[name="guest_name"]').value.trim(),
+        phone: document.querySelector('input[name="phone"]').value.trim(),
+        id_card: document.querySelector('input[name="id_card"]').value.trim(),
+        room_number: document.querySelector('select[name="room_number"]').value,
+        room_type: document.querySelector('input[name="room_type"]').value,
+        price: document.querySelector('input[name="price"]').value,
+        duration: document.querySelector('input[name="duration"]').value
+    };
+
+    // 验证数据
+    for (let key in formData) {
+        if (!formData[key]) {
+            alert('请填写完整所有信息');
+            return;
+        }
+    }
+
+    // 发送请求
+    fetch('/api/check-in', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('入住登记成功！');
+            window.location.reload();
+        } else {
+            alert('入住登记失败：' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('系统错误：' + error);
+        console.error(error);
+    });
+}
+</script>
+{% endblock %} 
