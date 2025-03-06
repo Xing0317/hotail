@@ -1,61 +1,140 @@
 {% extends "base.html" %}
 
+{% block styles %}
+<style>
+    /* 房间卡片响应式样式 */
+    .room-card {
+        transition: all 0.3s ease;
+        height: 100%;
+        margin-bottom: 15px;
+    }
+    .room-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .floor-title {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+    }
+    .room-grid {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    /* 房态图标优化 */
+    .status-icon {
+        width: 12px;
+        height: 12px;
+        display: inline-block;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+    
+    /* 价格标签样式 */
+    .price-tag {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+    }
+    
+    /* 过滤栏在移动设备上的优化 */
+    @media (max-width: 768px) {
+        .filter-section {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: white;
+            padding-top: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .filter-toggle {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .filter-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .filter-body.show {
+            max-height: 400px;
+        }
+        .room-grid {
+            max-height: calc(100vh - 250px);
+        }
+    }
+    
+    /* 快速入住按钮样式 */
+    .checkin-btn {
+        width: 100%;
+        margin-top: 8px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- 顶部卡片信息 -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 mb-3 mb-md-0">
             <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <h5 class="card-title">总房间数</h5>
-                    <h2 class="card-text">{{ room_stats.total }}</h2>
+                <div class="card-body p-2 p-md-3">
+                    <h5 class="card-title fs-6 fs-md-5">总房间数</h5>
+                    <h2 class="card-text fs-3 fs-md-2">{{ room_stats.total }}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 mb-3 mb-md-0">
             <div class="card bg-success text-white">
-                <div class="card-body">
-                    <h5 class="card-title">可用房间</h5>
-                    <h2 class="card-text">{{ room_stats.available }}</h2>
+                <div class="card-body p-2 p-md-3">
+                    <h5 class="card-title fs-6 fs-md-5">可用房间</h5>
+                    <h2 class="card-text fs-3 fs-md-2">{{ room_stats.available }}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card bg-danger text-white">
-                <div class="card-body">
-                    <h5 class="card-title">已入住</h5>
-                    <h2 class="card-text">{{ room_stats.occupied }}</h2>
+                <div class="card-body p-2 p-md-3">
+                    <h5 class="card-title fs-6 fs-md-5">已入住</h5>
+                    <h2 class="card-text fs-3 fs-md-2">{{ room_stats.occupied }}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card bg-info text-white">
-                <div class="card-body">
-                    <h5 class="card-title">入住率</h5>
-                    <h2 class="card-text">{{ room_stats.rate }}%</h2>
+                <div class="card-body p-2 p-md-3">
+                    <h5 class="card-title fs-6 fs-md-5">入住率</h5>
+                    <h2 class="card-text fs-3 fs-md-2">{{ room_stats.rate }}%</h2>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 房间过滤 -->
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h5 class="mb-0">房间过滤</h5>
-                </div>
-                <div class="col-auto">
-                    <button class="btn btn-sm btn-outline-secondary me-2" id="viewAllRooms">查看全部</button>
-                    <button class="btn btn-sm btn-outline-success me-2" id="viewAvailableRooms">查看可用</button>
-                    <button class="btn btn-sm btn-outline-danger" id="viewOccupiedRooms">查看已入住</button>
-                </div>
+    <!-- 房间过滤 - 移动端优化 -->
+    <div class="card mb-4 filter-section">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 d-none d-md-block">房间过滤</h5>
+            <div class="filter-toggle d-md-none w-100">
+                <button class="btn btn-sm btn-outline-secondary w-100" id="toggleFilter">
+                    <i class="fas fa-filter me-1"></i> 显示/隐藏过滤选项
+                </button>
+            </div>
+            <div class="d-none d-md-flex">
+                <button class="btn btn-sm btn-outline-secondary me-2" id="viewAllRooms">查看全部</button>
+                <button class="btn btn-sm btn-outline-success me-2" id="viewAvailableRooms">查看可用</button>
+                <button class="btn btn-sm btn-outline-danger" id="viewOccupiedRooms">查看已入住</button>
             </div>
         </div>
-        <div class="card-body p-3">
+        <div class="card-body p-2 p-md-3 filter-body" id="filterBody">
             <div class="row">
-                <div class="col-md-3">
-                    <label class="form-label">楼层</label>
+                <div class="col-6 col-md-3 mb-2">
+                    <label class="form-label small">楼层</label>
                     <select class="form-select form-select-sm" id="floorFilter">
                         <option value="">全部楼层</option>
                         <option value="1">1楼</option>
@@ -64,79 +143,79 @@
                         <option value="4">4楼</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">房型</label>
+                <div class="col-6 col-md-3 mb-2">
+                    <label class="form-label small">房型</label>
                     <select class="form-select form-select-sm" id="typeFilter">
                         <option value="">所有类型</option>
                         <option value="daily">按天</option>
                         <option value="hourly">按小时</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">价格范围</label>
+                <div class="col-6 col-md-3 mb-2">
+                    <label class="form-label small">价格范围</label>
                     <div class="input-group input-group-sm">
                         <input type="number" class="form-control" id="minPrice" placeholder="最低">
                         <span class="input-group-text">-</span>
                         <input type="number" class="form-control" id="maxPrice" placeholder="最高">
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">房号</label>
+                <div class="col-6 col-md-3 mb-2">
+                    <label class="form-label small">房号</label>
                     <input type="text" class="form-control form-control-sm" id="roomNumberSearch" placeholder="输入房号">
                 </div>
+            </div>
+            <div class="d-flex d-md-none justify-content-between mt-2">
+                <button class="btn btn-sm btn-outline-secondary" id="mobileViewAll">查看全部</button>
+                <button class="btn btn-sm btn-outline-success" id="mobileViewAvailable">查看可用</button>
+                <button class="btn btn-sm btn-outline-danger" id="mobileViewOccupied">查看已入住</button>
             </div>
         </div>
     </div>
 
-    <!-- 房态图 -->
+    <!-- 房态图 - 响应式布局 -->
     <div class="card">
         <div class="card-header bg-light">
             <h5 class="mb-0">房态一览表</h5>
         </div>
-        <div class="card-body p-3">
-            <div class="room-status-legend mb-3">
-                <span class="badge bg-success p-2 me-2">可用</span>
-                <span class="badge bg-danger p-2 me-2">已入住</span>
+        <div class="card-body p-2 p-md-3">
+            <div class="room-status-legend mb-3 text-center text-md-start">
+                <span class="badge bg-success p-2 me-2 mb-1 mb-md-0">可用</span>
+                <span class="badge bg-danger p-2 me-2 mb-1 mb-md-0">已入住</span>
             </div>
             
             <div class="room-grid">
                 {% for floor in floors %}
                 <div class="floor-section mb-4">
                     <h5 class="floor-title">{{ floor.floor_number }}楼</h5>
-                    <div class="row g-3">
+                    <div class="row">
                         {% for room in floor.rooms %}
-                        <div class="col-lg-2 col-md-3 col-sm-4 room-item" 
-                             data-room="{{ room.room_number }}" 
+                        <div class="col-6 col-md-4 col-lg-3 col-xl-2 mb-3 room-item" 
                              data-floor="{{ floor.floor_number }}"
+                             data-room="{{ room.room_number }}"
                              data-type="{{ room.room_type }}"
                              data-price="{{ room.price }}"
                              data-status="{{ room.status }}">
-                            <div class="card room-card h-100 {{ 'border-success' if room.status == 'available' else 'border-danger' if room.status == 'occupied' else 'border-warning' }}">
-                                <div class="card-header {{ 'bg-success text-white' if room.status == 'available' else 'bg-danger text-white' if room.status == 'occupied' else 'bg-warning' }} d-flex justify-content-between align-items-center">
-                                    <strong>{{ room.room_number }}</strong>
-                                    <span class="badge {{ 'bg-light text-dark' if room.status == 'available' or room.status == 'occupied' else 'bg-dark' }}">
-                                        {{ room.room_type_display }}
-                                    </span>
-                                </div>
-                                <div class="card-body p-2">
-                                    <div class="room-info">
-                                        <div class="d-flex justify-content-between mb-1">
-                                            <span>价格:</span>
-                                            <strong>¥{{ room.price }}</strong>
-                                        </div>
-                                        <div class="d-flex justify-content-between">
-                                            <span>状态:</span>
-                                            <strong>{{ room.status_display }}</strong>
-                                        </div>
+                            <div class="card room-card {{ 'bg-success bg-opacity-10' if room.status == 'available' else 'bg-danger bg-opacity-10' }}">
+                                <div class="card-body p-2 p-md-3 position-relative">
+                                    <div class="price-tag">
+                                        ¥{{ room.price }}
                                     </div>
-                                    
+                                    <h5 class="card-title mb-2">
+                                        <span class="status-icon {{ 'bg-success' if room.status == 'available' else 'bg-danger' }}"></span>
+                                        {{ room.room_number }}
+                                    </h5>
+                                    <p class="card-text mb-1 small">
+                                        <i class="fas {{ 'fa-calendar-day' if room.room_type == 'daily' else 'fa-clock' }} me-1"></i>
+                                        {{ room.room_type_display }}
+                                    </p>
+                                    <p class="card-text mb-1 small">
+                                        <i class="fas {{ 'fa-check-circle text-success' if room.status == 'available' else 'fa-times-circle text-danger' }} me-1"></i>
+                                        {{ room.status_display }}
+                                    </p>
                                     {% if room.status == 'available' %}
-                                    <button onclick="quickCheckIn('{{ room.room_number }}')" class="btn btn-sm btn-success w-100 mt-2">
-                                        一键入住
-                                    </button>
-                                    {% elif room.status == 'occupied' %}
-                                    <button onclick="roomDetail('{{ room.room_number }}')" class="btn btn-sm btn-outline-secondary w-100 mt-2">
-                                        查看详情
+                                    <button class="btn btn-sm btn-success checkin-btn" 
+                                            onclick="showQuickCheckIn('{{ room.room_number }}', '{{ room.room_type }}', {{ room.price }})">
+                                        <i class="fas fa-user-plus me-1"></i>一键入住
                                     </button>
                                     {% endif %}
                                 </div>
@@ -151,9 +230,9 @@
     </div>
 </div>
 
-<!-- 快速入住模态框 -->
+<!-- 快速入住模态框 - 移动端优化 -->
 <div class="modal fade" id="quickCheckInModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">快速入住 - 房间 <span id="selectedRoom"></span></h5>
@@ -210,133 +289,48 @@
 
 {% block scripts %}
 <script>
-// 初始化变量
-let quickCheckInModal;
+// 全局变量
 let allRooms = [];
 
-// 页面加载完成
+// 页面加载完成后
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化模态框
-    quickCheckInModal = new bootstrap.Modal(document.getElementById('quickCheckInModal'));
-    
-    // 收集所有房间元素
+    // 获取所有房间元素
     allRooms = document.querySelectorAll('.room-item');
     
-    // 设置默认当前时间
-    const now = new Date();
-    const formattedTime = now.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
-    document.getElementById('checkInTime').value = formattedTime;
-    
-    // 绑定过滤器事件
-    document.getElementById('floorFilter').addEventListener('change', filterRooms);
-    document.getElementById('typeFilter').addEventListener('change', filterRooms);
-    document.getElementById('roomNumberSearch').addEventListener('input', filterRooms);
-    document.getElementById('minPrice').addEventListener('input', filterRooms);
-    document.getElementById('maxPrice').addEventListener('input', filterRooms);
-    
-    // 快捷按钮
+    // 桌面端按钮事件
     document.getElementById('viewAllRooms').addEventListener('click', showAllRooms);
     document.getElementById('viewAvailableRooms').addEventListener('click', showAvailableRooms);
     document.getElementById('viewOccupiedRooms').addEventListener('click', showOccupiedRooms);
+    
+    // 移动端按钮事件
+    document.getElementById('mobileViewAll').addEventListener('click', showAllRooms);
+    document.getElementById('mobileViewAvailable').addEventListener('click', showAvailableRooms);
+    document.getElementById('mobileViewOccupied').addEventListener('click', showOccupiedRooms);
+    
+    // 过滤器事件
+    document.getElementById('floorFilter').addEventListener('change', applyFilters);
+    document.getElementById('typeFilter').addEventListener('change', applyFilters);
+    document.getElementById('minPrice').addEventListener('input', applyFilters);
+    document.getElementById('maxPrice').addEventListener('input', applyFilters);
+    document.getElementById('roomNumberSearch').addEventListener('input', applyFilters);
+    
+    // 移动端过滤器切换
+    document.getElementById('toggleFilter').addEventListener('click', function() {
+        const filterBody = document.getElementById('filterBody');
+        filterBody.classList.toggle('show');
+    });
+    
+    // 初始化显示过滤器（在桌面模式下）
+    if (window.innerWidth >= 768) {
+        document.getElementById('filterBody').classList.add('show');
+    }
+    
+    // 快速入住表单的时长变化监听
+    document.querySelector('#quickCheckInForm input[name="duration"]').addEventListener('input', calculateModalPrice);
 });
 
-// 快速入住初始化
-function quickCheckIn(roomNumber) {
-    // 清空表单
-    document.getElementById('quickCheckInForm').reset();
-    
-    // 设置所选房间信息
-    const roomCard = document.querySelector(`.room-item[data-room="${roomNumber}"]`);
-    const roomType = roomCard.dataset.type;
-    const roomPrice = roomCard.dataset.price;
-    
-    document.getElementById('selectedRoom').textContent = roomNumber;
-    document.getElementById('quickRoomNumber').value = roomNumber;
-    document.getElementById('quickRoomType').value = roomType;
-    document.getElementById('quickRoomPrice').value = roomPrice;
-    
-    // 设置单位文本
-    document.getElementById('modalDurationUnit').textContent = roomType === 'hourly' ? '小时' : '天';
-    
-    // 设置初始价格
-    document.querySelector('#quickCheckInForm input[name="total_price"]').value = roomPrice;
-    
-    // 绑定时长变化事件
-    document.querySelector('#quickCheckInForm input[name="duration"]').addEventListener('input', calculateQuickCheckInPrice);
-    
-    // 显示模态框
-    quickCheckInModal.show();
-}
-
-// 计算快速入住价格
-function calculateQuickCheckInPrice() {
-    const price = document.getElementById('quickRoomPrice').value;
-    const duration = document.querySelector('#quickCheckInForm input[name="duration"]').value;
-    if (price && duration) {
-        const total = (parseFloat(price) * parseInt(duration)).toFixed(2);
-        document.querySelector('#quickCheckInForm input[name="total_price"]').value = total;
-    }
-}
-
-// 提交快速入住
-function submitQuickCheckIn() {
-    // 获取表单数据
-    const formData = {
-        guest_name: document.querySelector('#quickCheckInForm input[name="guest_name"]').value.trim(),
-        phone: document.querySelector('#quickCheckInForm input[name="phone"]').value.trim(),
-        id_card: document.querySelector('#quickCheckInForm input[name="id_card"]').value.trim(),
-        room_number: document.getElementById('quickRoomNumber').value,
-        room_type: document.getElementById('quickRoomType').value,
-        price: document.getElementById('quickRoomPrice').value,
-        duration: document.querySelector('#quickCheckInForm input[name="duration"]').value
-    };
-
-    // 验证数据
-    for (let key in formData) {
-        if (!formData[key]) {
-            alert('请填写完整所有信息');
-            return;
-        }
-    }
-
-    // 发送请求
-    fetch('/api/check-in', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('入住登记成功！');
-            quickCheckInModal.hide();
-            window.location.reload();
-        } else {
-            alert('入住登记失败：' + data.error);
-        }
-    })
-    .catch(error => {
-        alert('系统错误：' + error);
-        console.error(error);
-    });
-}
-
-// 查看房间详情
-function roomDetail(roomNumber) {
-    window.location.href = `/room-detail/${roomNumber}`;
-}
-
-// 过滤房间
-function filterRooms() {
+// 应用过滤器
+function applyFilters() {
     const floor = document.getElementById('floorFilter').value;
     const type = document.getElementById('typeFilter').value;
     const roomNumber = document.getElementById('roomNumberSearch').value.toLowerCase();
@@ -377,12 +371,7 @@ function filterRooms() {
 
 // 显示所有房间
 function showAllRooms() {
-    document.getElementById('floorFilter').value = '';
-    document.getElementById('typeFilter').value = '';
-    document.getElementById('roomNumberSearch').value = '';
-    document.getElementById('minPrice').value = '';
-    document.getElementById('maxPrice').value = '';
-    
+    resetFilters();
     allRooms.forEach(room => {
         room.style.display = '';
     });
@@ -390,40 +379,118 @@ function showAllRooms() {
 
 // 只显示可用房间
 function showAvailableRooms() {
-    showAllRooms();
+    resetFilters();
     allRooms.forEach(room => {
         if (room.dataset.status !== 'available') {
             room.style.display = 'none';
+        } else {
+            room.style.display = '';
         }
     });
 }
 
 // 只显示已入住房间
 function showOccupiedRooms() {
-    showAllRooms();
+    resetFilters();
     allRooms.forEach(room => {
         if (room.dataset.status !== 'occupied') {
             room.style.display = 'none';
+        } else {
+            room.style.display = '';
         }
     });
 }
+
+// 重置过滤器
+function resetFilters() {
+    document.getElementById('floorFilter').value = '';
+    document.getElementById('typeFilter').value = '';
+    document.getElementById('roomNumberSearch').value = '';
+    document.getElementById('minPrice').value = '';
+    document.getElementById('maxPrice').value = '';
+}
+
+// 计算模态框中的价格
+function calculateModalPrice() {
+    const price = document.getElementById('quickRoomPrice').value;
+    const duration = document.querySelector('#quickCheckInForm input[name="duration"]').value;
+    
+    if (price && duration) {
+        const total = (parseFloat(price) * parseInt(duration)).toFixed(2);
+        document.querySelector('#quickCheckInForm input[name="total_price"]').value = total;
+    }
+}
+
+// 响应式适配
+window.addEventListener('resize', function() {
+    const filterBody = document.getElementById('filterBody');
+    if (window.innerWidth >= 768) {
+        filterBody.classList.add('show');
+    } else {
+        filterBody.classList.remove('show');
+    }
+});
+
+// 显示快速入住模态框
+function showQuickCheckIn(roomNumber, roomType, price) {
+    // 设置模态框数据
+    document.getElementById('selectedRoom').textContent = roomNumber;
+    document.getElementById('quickRoomNumber').value = roomNumber;
+    document.getElementById('quickRoomType').value = roomType;
+    document.getElementById('quickRoomPrice').value = price;
+    document.getElementById('modalDurationUnit').textContent = roomType === 'hourly' ? '小时' : '天';
+    
+    // 计算初始价格
+    calculateModalPrice();
+    
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('quickCheckInModal'));
+    modal.show();
+}
+
+// 提交快速入住表单
+function submitQuickCheckIn() {
+    const form = document.getElementById('quickCheckInForm');
+    
+    // 表单验证
+    if (!form.checkValidity()) {
+        alert('请填写完整所有必填信息');
+        return;
+    }
+    
+    // 收集表单数据
+    const formData = {
+        guest_name: form.querySelector('[name="guest_name"]').value.trim(),
+        phone: form.querySelector('[name="phone"]').value.trim(),
+        id_card: form.querySelector('[name="id_card"]').value.trim(),
+        room_number: document.getElementById('quickRoomNumber').value,
+        room_type: document.getElementById('quickRoomType').value,
+        price: document.getElementById('quickRoomPrice').value,
+        duration: form.querySelector('[name="duration"]').value,
+        total_price: form.querySelector('[name="total_price"]').value
+    };
+    
+    // 发送请求
+    fetch('/api/check-in', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('入住登记成功！');
+            window.location.reload(); // 刷新页面更新房态
+        } else {
+            alert('入住登记失败：' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('系统错误：' + error);
+        console.error(error);
+    });
+}
 </script>
-<style>
-.room-card {
-    transition: all 0.3s ease;
-}
-.room-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-.floor-title {
-    border-bottom: 2px solid #eee;
-    padding-bottom: 8px;
-    margin-bottom: 15px;
-}
-.room-grid {
-    max-height: 70vh;
-    overflow-y: auto;
-}
-</style>
 {% endblock %} 
