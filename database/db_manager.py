@@ -1,34 +1,48 @@
 import sqlite3
+import os
+import sys
 from datetime import datetime
 
 class DatabaseManager:
-    def __init__(self, db_name="hotel.db"):
-        self.db_name = db_name
-        self.conn = None
-        self.cursor = None
-        self.connect()
-        self.create_tables()
-    
-    def connect(self):
-        """建立数据库连接"""
-        self.conn = sqlite3.connect(self.db_name)
-        self.cursor = self.conn.cursor()
-    
-    def create_tables(self):
-        """创建必要的数据表"""
-        # 房间表
-        self.cursor.execute('''
+    def __init__(self):
+        # 获取应用程序的根目录
+        if getattr(sys, 'frozen', False):
+            # 如果是打包后的应用
+            application_path = os.path.dirname(sys.executable)
+        else:
+            # 如果是开发环境
+            application_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+        # 确保数据目录存在
+        data_dir = os.path.join(application_path, 'data')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+            
+        # 设置数据库文件路径
+        self.db_path = os.path.join(data_dir, 'hotel.db')
+        
+        # 连接数据库
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
+        
+        # 初始化数据库表
+        self.init_db()
+
+    def init_db(self):
+        cursor = self.conn.cursor()
+        
+        # 创建房间表
+        cursor.execute('''
         CREATE TABLE IF NOT EXISTS rooms (
-            room_id INTEGER PRIMARY KEY,
-            room_number TEXT UNIQUE,
-            room_type TEXT,
-            price REAL,
+            room_number TEXT PRIMARY KEY,
+            room_type TEXT NOT NULL,
+            price REAL NOT NULL,
             status TEXT DEFAULT 'available'
         )
         ''')
         
-        # 入住记录表
-        self.cursor.execute('''
+        # 创建入住记录表
+        cursor.execute('''
         CREATE TABLE IF NOT EXISTS check_ins (
             check_in_id INTEGER PRIMARY KEY,
             guest_name TEXT,
@@ -48,7 +62,7 @@ class DatabaseManager:
         ''')
         
         self.conn.commit()
-    
+
     def close(self):
         """关闭数据库连接"""
         if self.conn:
@@ -56,18 +70,20 @@ class DatabaseManager:
 
     def get_available_rooms(self):
         """获取所有可用房间"""
-        self.cursor.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
         SELECT room_number, room_type, price 
         FROM rooms 
         WHERE status = 'available'
         ''')
         # 将结果转换为字典列表
-        columns = [desc[0] for desc in self.cursor.description]
-        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def create_check_in(self, **kwargs):
         """创建入住记录"""
         try:
+            cursor = self.conn.cursor()
             # 创建入住记录
             sql = '''
             INSERT INTO check_ins (
@@ -88,7 +104,7 @@ class DatabaseManager:
                 if field not in kwargs:
                     raise ValueError(f"缺少必要字段: {field}")
             
-            self.cursor.execute(sql, (
+            cursor.execute(sql, (
                 kwargs['guest_name'],
                 kwargs['phone'],
                 kwargs['id_card'],
@@ -101,7 +117,7 @@ class DatabaseManager:
                 kwargs['check_out_time']
             ))
             
-            check_in_id = self.cursor.lastrowid
+            check_in_id = cursor.lastrowid
             
             # 更新房间状态
             self.update_room_status(kwargs['room_number'], 'occupied')
@@ -114,7 +130,8 @@ class DatabaseManager:
 
     def update_room_status(self, room_number, status):
         """更新房间状态"""
-        self.cursor.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
         UPDATE rooms 
         SET status = ? 
         WHERE room_number = ?
@@ -122,6 +139,7 @@ class DatabaseManager:
 
     def get_revenue_statistics(self, start_date, end_date):
         """获取收入统计"""
+        cursor = self.conn.cursor()
         sql = '''
         WITH RECURSIVE dates(date) AS (
             SELECT date(?)
@@ -140,12 +158,13 @@ class DatabaseManager:
         GROUP BY dates.date
         ORDER BY dates.date
         '''
-        self.cursor.execute(sql, (start_date, end_date))
-        columns = [desc[0] for desc in self.cursor.description]
-        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        cursor.execute(sql, (start_date, end_date))
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def get_occupancy_rate(self, start_date, end_date):
         """计算入住率"""
+        cursor = self.conn.cursor()
         sql = '''
         WITH RECURSIVE dates(date) AS (
             SELECT date(?)
@@ -165,12 +184,13 @@ class DatabaseManager:
         GROUP BY d.date
         ORDER BY d.date
         '''
-        self.cursor.execute(sql, (start_date, end_date))
-        columns = [desc[0] for desc in self.cursor.description]
-        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        cursor.execute(sql, (start_date, end_date))
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def search_check_ins(self, name='', phone='', room='', page=1, page_size=10):
         """搜索入住记录"""
+        cursor = self.conn.cursor()
         conditions = []
         params = []
         
@@ -188,8 +208,8 @@ class DatabaseManager:
         
         # 计算总记录数
         count_sql = f"SELECT COUNT(*) FROM check_ins WHERE {where_clause}"
-        self.cursor.execute(count_sql, params)
-        total = self.cursor.fetchone()[0]
+        cursor.execute(count_sql, params)
+        total = cursor.fetchone()[0]
         
         # 获取分页数据
         offset = (page - 1) * page_size
@@ -210,9 +230,9 @@ class DatabaseManager:
         LIMIT ? OFFSET ?
         """
         
-        self.cursor.execute(sql, params + [page_size, offset])
-        columns = [desc[0] for desc in self.cursor.description]
-        records = [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        cursor.execute(sql, params + [page_size, offset])
+        columns = [desc[0] for desc in cursor.description]
+        records = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
         return {
             'total': total,
@@ -221,40 +241,43 @@ class DatabaseManager:
 
     def get_room_status(self, room_number):
         """获取房间状态"""
-        self.cursor.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
         SELECT status 
         FROM rooms 
         WHERE room_number = ?
         ''', (room_number,))
-        result = self.cursor.fetchone()
+        result = cursor.fetchone()
         return result[0] if result else None
 
     def get_all_rooms(self):
         """获取所有房间"""
-        self.cursor.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
         SELECT room_number, room_type, price, status
         FROM rooms
         ORDER BY room_number
         ''')
-        columns = [desc[0] for desc in self.cursor.description]
-        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def process_check_out(self, check_in_id):
         """处理退房"""
+        cursor = self.conn.cursor()
         # 获取入住记录
-        self.cursor.execute('''
+        cursor.execute('''
         SELECT room_number 
         FROM check_ins 
         WHERE check_in_id = ?
         ''', (check_in_id,))
-        result = self.cursor.fetchone()
+        result = cursor.fetchone()
         if not result:
             raise ValueError("找不到入住记录")
         
         room_number = result[0]
         
         # 更新退房时间
-        self.cursor.execute('''
+        cursor.execute('''
         UPDATE check_ins 
         SET actual_check_out_time = ? 
         WHERE check_in_id = ?
@@ -266,11 +289,12 @@ class DatabaseManager:
     def create_room(self, room_number, room_type, price):
         """添加新房间"""
         try:
+            cursor = self.conn.cursor()
             sql = '''
             INSERT INTO rooms (room_number, room_type, price)
             VALUES (?, ?, ?)
             '''
-            self.cursor.execute(sql, (room_number, room_type, float(price)))
+            cursor.execute(sql, (room_number, room_type, float(price)))
             self.conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -281,13 +305,14 @@ class DatabaseManager:
     def update_room(self, room_number, room_type, price):
         """更新房间信息"""
         try:
+            cursor = self.conn.cursor()
             sql = '''
             UPDATE rooms
             SET room_type = ?, price = ?
             WHERE room_number = ?
             '''
-            self.cursor.execute(sql, (room_type, float(price), room_number))
-            if self.cursor.rowcount == 0:
+            cursor.execute(sql, (room_type, float(price), room_number))
+            if cursor.rowcount == 0:
                 raise ValueError("房间不存在")
             self.conn.commit()
             return True
@@ -296,11 +321,12 @@ class DatabaseManager:
 
     def get_room(self, room_number):
         """获取单个房间信息"""
-        self.cursor.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
         SELECT room_number, room_type, price, status
         FROM rooms
         WHERE room_number = ?
         ''', (room_number,))
-        columns = [desc[0] for desc in self.cursor.description]
-        result = self.cursor.fetchone()
+        columns = [desc[0] for desc in cursor.description]
+        result = cursor.fetchone()
         return dict(zip(columns, result)) if result else None 

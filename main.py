@@ -3,6 +3,7 @@ from database.db_manager import DatabaseManager
 from app.routes.check_in import check_in_bp
 from app.routes.statistics import statistics_bp
 from app.routes.rooms import rooms_bp
+from app.routes.dashboard import dashboard_bp
 from app.middleware import login_required
 import os
 
@@ -21,6 +22,7 @@ def create_app():
     app.register_blueprint(check_in_bp)
     app.register_blueprint(statistics_bp)
     app.register_blueprint(rooms_bp)
+    app.register_blueprint(dashboard_bp)
     
     @app.route('/login', methods=['GET', 'POST'])
     def login():
