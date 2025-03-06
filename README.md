@@ -18,6 +18,17 @@
 - **后端**：Python, Flask
 - **数据库**：SQLite
 
+## 项目截图
+
+![登录页面](./app/static/images/login.png)
+![房态一览页面](./app/static/images/index.jpg)
+
+![入住登记页面](./app/static/images/check_in.jpg)
+
+![房间管理页面](./app/static/images/room.png)
+
+![统计信息页面](./app/static/images/statistics.jpg)
+
 ## 安装与运行
 
 ### 环境要求
