@@ -27,7 +27,12 @@
                         <input type="text" class="form-control" id="searchRoom" placeholder="房间号">
                     </div>
                     <div class="col-md-3">
-                        <button class="btn btn-primary" onclick="searchRecords()">搜索</button>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="searchRecords()">搜索</button>
+                            <button class="btn btn-success" onclick="exportRecords()">
+                                <i class="fas fa-file-excel me-1"></i>导出
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="table-responsive">
@@ -374,6 +379,20 @@ function refundDeposit(checkInId) {
             alert('系统错误：' + error);
         });
     }
+}
+
+function exportRecords() {
+    const name = document.getElementById('searchName').value;
+    const phone = document.getElementById('searchPhone').value;
+    const room = document.getElementById('searchRoom').value;
+    
+    // 构建导出 URL
+    const url = `/api/check-in/export?name=${name}&phone=${phone}&room=${room}`;
+    
+    // 创建一个临时链接并触发下载
+    const link = document.createElement('a');
+    link.href = url;
+    link.click();
 }
 
 // 页面加载时设置默认时间范围

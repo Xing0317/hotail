@@ -182,10 +182,15 @@ class DatabaseManager:
         FROM check_ins 
         WHERE {where_clause}
         ORDER BY check_in_time DESC
-        LIMIT ? OFFSET ?
         '''
         
-        cursor.execute(sql, params + [page_size, (page - 1) * page_size])
+        # 如果需要分页，添加 LIMIT 和 OFFSET
+        if page_size > 0:
+            sql += ' LIMIT ? OFFSET ?'
+            cursor.execute(sql, params + [page_size, (page - 1) * page_size])
+        else:
+            cursor.execute(sql, params)
+        
         columns = [desc[0] for desc in cursor.description]
         records = [dict(zip(columns, row)) for row in cursor.fetchall()]
         

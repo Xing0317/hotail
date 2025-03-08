@@ -1,6 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, send_file
 from database.db_manager import DatabaseManager
 from datetime import datetime, timedelta
+import os
+from openpyxl import Workbook
+from io import BytesIO
 
 check_in_bp = Blueprint('check_in', __name__, url_prefix='')
 
@@ -119,5 +122,78 @@ def refund_check_in(check_in_id):
     except Exception as e:
         db.conn.rollback()
         return jsonify({"success": False, "error": str(e)})
+    finally:
+        db.close()
+
+@check_in_bp.route('/api/check-in/export', methods=['GET'])
+def export_check_ins():
+    """导出入住记录"""
+    name = request.args.get('name', '')
+    phone = request.args.get('phone', '')
+    room = request.args.get('room', '')
+    
+    db = DatabaseManager()
+    try:
+        # 获取所有符合条件的记录（不分页）
+        result = db.search_check_ins(name, phone, room, page=1, page_size=10000)
+        records = result['records']
+        
+        # 创建工作簿和工作表
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "入住记录"
+        
+        # 写入表头
+        headers = [
+            '房间号', '客人姓名', '手机号', '身份证号',
+            '入住时间', '预计退房时间', '实际退房时间',
+            '房费', '押金', '押金状态', '状态'
+        ]
+        ws.append(headers)
+        
+        # 写入数据
+        for record in records:
+            ws.append([
+                record['room_number'],
+                record['guest_name'],
+                record['phone'],
+                record['id_card'],
+                record['check_in_time'],
+                record['check_out_time'],
+                record['actual_check_out_time'] or '',
+                record['total_price'],
+                record['deposit'],
+                '已退还' if record['deposit_returned'] else '未退还',
+                '已退房' if record['actual_check_out_time'] else '在住'
+            ])
+        
+        # 调整列宽
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 生成文件名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'酒店数据_{timestamp}.xlsx'
+        
+        # 保存到内存
+        excel_file = BytesIO()
+        wb.save(excel_file)
+        excel_file.seek(0)
+        
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
     finally:
         db.close() 
