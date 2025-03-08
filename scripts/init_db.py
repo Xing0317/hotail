@@ -49,6 +49,7 @@ def init_database():
             price_per_unit REAL,
             duration INTEGER,
             total_price REAL,
+            deposit REAL,
             check_in_time TIMESTAMP,
             check_out_time TIMESTAMP,
             actual_check_out_time TIMESTAMP,

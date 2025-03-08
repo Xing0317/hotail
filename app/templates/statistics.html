@@ -41,7 +41,9 @@
                                 <th>入住时间</th>
                                 <th>预计退房时间</th>
                                 <th>实际退房时间</th>
-                                <th>费用</th>
+                                <th>房费</th>
+                                <th>押金</th>
+                                <th>押金状态</th>
                                 <th>状态</th>
                                 <th>操作</th>
                             </tr>
@@ -83,10 +85,10 @@
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header">
-                                <h5>入住率统计</h5>
+                                <h5>押金统计</h5>
                             </div>
                             <div class="card-body">
-                                <canvas id="occupancyChart"></canvas>
+                                <canvas id="depositChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -104,7 +106,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
 <script>
 let revenueChart = null;
-let occupancyChart = null;
+let depositChart = null;
 
 function loadStatistics() {
     const startDate = moment(document.getElementById('startDate').value).startOf('day');
@@ -119,12 +121,12 @@ function loadStatistics() {
             }
         });
 
-    // 加载入住率统计
-    fetch(`/api/statistics/occupancy?start_date=${startDate.format('YYYY-MM-DD HH:mm:ss')}&end_date=${endDate.format('YYYY-MM-DD HH:mm:ss')}`)
+    // 加载押金统计
+    fetch(`/api/statistics/deposit?start_date=${startDate.format('YYYY-MM-DD HH:mm:ss')}&end_date=${endDate.format('YYYY-MM-DD HH:mm:ss')}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                updateOccupancyChart(data.data);
+                updateDepositChart(data.data);
             }
         });
 }
@@ -184,24 +186,20 @@ function updateRevenueChart(data) {
     });
 }
 
-function updateOccupancyChart(data) {
-    const ctx = document.getElementById('occupancyChart').getContext('2d');
+function updateDepositChart(data) {
+    const ctx = document.getElementById('depositChart').getContext('2d');
     
-    if (occupancyChart) {
-        occupancyChart.destroy();
+    if (depositChart) {
+        depositChart.destroy();
     }
 
-    occupancyChart = new Chart(ctx, {
+    depositChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(item => moment(item.date).format('MM-DD')),
             datasets: [{
-                label: '入住率',
-                data: data.map(item => ({
-                    y: item.occupancy_rate,
-                    occupied: item.occupied_rooms,
-                    total: item.total_rooms
-                })),
+                label: '押金',
+                data: data.map(item => parseFloat(item.deposit || 0)),
                 borderColor: '#4bc0c0',
                 fill: false
             }]
@@ -217,11 +215,10 @@ function updateOccupancyChart(data) {
                     }
                 },
                 y: {
-                    min: 0,
-                    max: 100,
+                    beginAtZero: true,
                     title: {
                         display: true,
-                        text: '入住率（%）'
+                        text: '押金（元）'
                     }
                 }
             },
@@ -231,9 +228,7 @@ function updateOccupancyChart(data) {
                         label: function(context) {
                             const data = context.raw;
                             return [
-                                `入住率: ${data.y}%`,
-                                `已住房间: ${data.occupied}`,
-                                `总房间数: ${data.total}`
+                                `押金: ¥${data}`
                             ];
                         }
                     }
@@ -319,16 +314,23 @@ function updateSearchResults(records) {
             <td>${record.check_out_time}</td>
             <td>${record.actual_check_out_time || '-'}</td>
             <td>¥${record.total_price}</td>
+            <td>¥${record.deposit}</td>
+            <td>
+                <span class="badge ${record.deposit_returned ? 'bg-success' : 'bg-warning'}">
+                    ${record.deposit_returned ? '已退款' : '未退款'}
+                </span>
+            </td>
             <td>
                 <span class="badge ${record.actual_check_out_time ? 'bg-secondary' : 'bg-primary'}">
                     ${record.actual_check_out_time ? '已退房' : '在住'}
                 </span>
             </td>
             <td>
-                ${record.actual_check_out_time ? '' : 
-                `<button class="btn btn-sm btn-warning" onclick="checkOut('${record.check_in_id}')">
-                    退房
-                </button>`}
+                ${record.actual_check_out_time ? 
+                    (!record.deposit_returned ? 
+                        `<button class="btn btn-sm btn-warning" onclick="refundDeposit(${record.check_in_id})">退押金</button>` 
+                        : '') 
+                    : `<button class="btn btn-sm btn-warning" onclick="checkOut(${record.check_in_id})">退房</button>`}
             </td>
         `;
         tbody.appendChild(row);
@@ -352,6 +354,26 @@ function checkOut(checkInId) {
             alert('退房失败：' + data.error);
         }
     });
+}
+
+function refundDeposit(checkInId) {
+    if (confirm('确认要退还押金吗？')) {
+        fetch(`/api/check-in/${checkInId}/refund`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('押金退还成功！');
+                searchRecords(); // 刷新记录列表
+            } else {
+                alert('押金退还失败：' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('系统错误：' + error);
+        });
+    }
 }
 
 // 页面加载时设置默认时间范围

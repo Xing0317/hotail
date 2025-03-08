@@ -52,15 +52,15 @@ class DatabaseManager:
             INSERT INTO check_ins (
                 guest_name, phone, id_card, room_number, 
                 room_type, price_per_unit, duration,
-                total_price, check_in_time, check_out_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                total_price, deposit, check_in_time, check_out_time, deposit_returned
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
             
             # 确保所有必要字段都存在
             required_fields = [
                 'guest_name', 'phone', 'id_card', 'room_number',
                 'room_type', 'price_per_unit', 'duration', 'total_price',
-                'check_out_time'
+                'deposit', 'check_out_time'
             ]
             
             for field in required_fields:
@@ -76,8 +76,10 @@ class DatabaseManager:
                 float(kwargs['price_per_unit']),
                 int(kwargs['duration']),
                 float(kwargs['total_price']),
+                float(kwargs['deposit']),
                 datetime.now(),
-                kwargs['check_out_time']
+                kwargs['check_out_time'],
+                0  # 默认未退款
             ))
             
             check_in_id = cursor.lastrowid
@@ -85,10 +87,8 @@ class DatabaseManager:
             # 更新房间状态
             self.update_room_status(kwargs['room_number'], 'occupied')
             
-            # 注意：这里不进行提交，由调用方负责提交或回滚
             return check_in_id
         except Exception as e:
-            # 不在这里回滚，让调用方处理
             raise Exception(f"创建入住记录失败: {str(e)}")
 
     def update_room_status(self, room_number, status):
@@ -169,37 +169,29 @@ class DatabaseManager:
         
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         
-        # 计算总记录数
+        # 获取总记录数
         count_sql = f"SELECT COUNT(*) FROM check_ins WHERE {where_clause}"
         cursor.execute(count_sql, params)
         total = cursor.fetchone()[0]
         
         # 获取分页数据
-        offset = (page - 1) * page_size
-        sql = f"""
-        SELECT 
-            check_in_id,
-            room_number,
-            guest_name,
-            phone,
-            id_card,
-            strftime('%Y-%m-%d %H:%M:%S', check_in_time) as check_in_time,
-            strftime('%Y-%m-%d %H:%M:%S', check_out_time) as check_out_time,
-            strftime('%Y-%m-%d %H:%M:%S', actual_check_out_time) as actual_check_out_time,
-            total_price
-        FROM check_ins
+        sql = f'''
+        SELECT check_in_id, guest_name, phone, id_card, room_number,
+               check_in_time, check_out_time, actual_check_out_time,
+               total_price, deposit, deposit_returned
+        FROM check_ins 
         WHERE {where_clause}
         ORDER BY check_in_time DESC
         LIMIT ? OFFSET ?
-        """
+        '''
         
-        cursor.execute(sql, params + [page_size, offset])
+        cursor.execute(sql, params + [page_size, (page - 1) * page_size])
         columns = [desc[0] for desc in cursor.description]
         records = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
         return {
-            'total': total,
-            'records': records
+            "total": total,
+            "records": records
         }
 
     def get_room_status(self, room_number):
@@ -292,4 +284,30 @@ class DatabaseManager:
         ''', (room_number,))
         columns = [desc[0] for desc in cursor.description]
         result = cursor.fetchone()
-        return dict(zip(columns, result)) if result else None 
+        return dict(zip(columns, result)) if result else None
+
+    def get_deposit_by_date(self, date):
+        """获取指定日期的押金总额"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+        SELECT SUM(deposit) 
+        FROM check_ins 
+        WHERE date(check_in_time) = ?
+        ''', (date,))
+        result = cursor.fetchone()
+        return result[0] if result else 0
+
+    def get_deposit_statistics(self, start_date, end_date):
+        """获取押金统计"""
+        cursor = self.conn.cursor()
+        sql = '''
+        SELECT 
+            check_in_time,
+            deposit,
+            deposit_returned
+        FROM check_ins
+        WHERE check_in_time BETWEEN ? AND ?
+        '''
+        cursor.execute(sql, (start_date, end_date))
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]

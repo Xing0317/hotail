@@ -44,6 +44,15 @@
                 </div>
             </div>
             <div class="col-md-6 mb-3">
+                <label class="form-label">押金</label>
+                <div class="input-group">
+                    <span class="input-group-text">¥</span>
+                    <input type="number" class="form-control" name="deposit" required min="0">
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
                 <label class="form-label">费用</label>
                 <div class="input-group">
                     <span class="input-group-text">¥</span>
@@ -105,7 +114,8 @@ function submitCheckIn() {
         room_number: document.querySelector('select[name="room_number"]').value,
         room_type: document.querySelector('input[name="room_type"]').value,
         price: document.querySelector('input[name="price"]').value,
-        duration: document.querySelector('input[name="duration"]').value
+        duration: document.querySelector('input[name="duration"]').value,
+        deposit: document.querySelector('input[name="deposit"]').value
     };
 
     // 验证数据

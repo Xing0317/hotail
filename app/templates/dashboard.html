@@ -232,55 +232,56 @@
 
 <!-- 快速入住模态框 - 移动端优化 -->
 <div class="modal fade" id="quickCheckInModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">快速入住 - 房间 <span id="selectedRoom"></span></h5>
+                <h5 class="modal-title">快速入住</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="quickCheckInForm">
-                    <input type="hidden" name="room_number" id="quickRoomNumber">
-                    <input type="hidden" name="room_type" id="quickRoomType">
-                    <input type="hidden" name="price" id="quickRoomPrice">
+                    <input type="hidden" id="quickRoomNumber">
+                    <input type="hidden" id="quickRoomType">
+                    <input type="hidden" id="quickRoomPrice">
                     
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">客人姓名</label>
-                            <input type="text" class="form-control" name="guest_name" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">手机号码</label>
-                            <input type="tel" class="form-control" name="phone" required pattern="[0-9]{11}">
+                    <div class="mb-3">
+                        <label class="form-label">客人姓名</label>
+                        <input type="text" class="form-control" name="guest_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">手机号码</label>
+                        <input type="tel" class="form-control" name="phone" required pattern="[0-9]{11}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">身份证号</label>
+                        <input type="text" class="form-control" name="id_card" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">入住时长</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="duration" required min="1" value="1" onchange="calculateTotalPrice()">
+                            <span class="input-group-text" id="durationUnit">天/小时</span>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">身份证号</label>
-                            <input type="text" class="form-control" name="id_card" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">入住时长</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="duration" required min="1" value="1">
-                                <span class="input-group-text" id="modalDurationUnit">天</span>
-                            </div>
+                    <div class="mb-3">
+                        <label class="form-label">押金</label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input type="number" class="form-control" name="deposit" required min="0">
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">费用</label>
-                            <div class="input-group">
-                                <span class="input-group-text">¥</span>
-                                <input type="number" class="form-control" name="total_price" step="0.01" readonly>
-                            </div>
+                    <div class="mb-3">
+                        <label class="form-label">总费用</label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input type="number" class="form-control" name="total_price" readonly>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-success" onclick="submitQuickCheckIn()">确认入住</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickCheckIn()">确认入住</button>
             </div>
         </div>
     </div>
@@ -326,7 +327,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 快速入住表单的时长变化监听
-    document.querySelector('#quickCheckInForm input[name="duration"]').addEventListener('input', calculateModalPrice);
+    document.querySelector('#quickCheckInForm input[name="duration"]').addEventListener('input', calculateTotalPrice);
 });
 
 // 应用过滤器
@@ -411,13 +412,12 @@ function resetFilters() {
 }
 
 // 计算模态框中的价格
-function calculateModalPrice() {
-    const price = document.getElementById('quickRoomPrice').value;
-    const duration = document.querySelector('#quickCheckInForm input[name="duration"]').value;
-    
+function calculateTotalPrice() {
+    const price = parseFloat(document.getElementById('quickRoomPrice').value);
+    const duration = parseInt(document.querySelector('input[name="duration"]').value);
     if (price && duration) {
-        const total = (parseFloat(price) * parseInt(duration)).toFixed(2);
-        document.querySelector('#quickCheckInForm input[name="total_price"]').value = total;
+        const total = (price * duration).toFixed(2);
+        document.querySelector('input[name="total_price"]').value = total;
     }
 }
 
@@ -433,15 +433,15 @@ window.addEventListener('resize', function() {
 
 // 显示快速入住模态框
 function showQuickCheckIn(roomNumber, roomType, price) {
-    // 设置模态框数据
-    document.getElementById('selectedRoom').textContent = roomNumber;
     document.getElementById('quickRoomNumber').value = roomNumber;
     document.getElementById('quickRoomType').value = roomType;
     document.getElementById('quickRoomPrice').value = price;
-    document.getElementById('modalDurationUnit').textContent = roomType === 'hourly' ? '小时' : '天';
     
-    // 计算初始价格
-    calculateModalPrice();
+    // 设置时长单位显示
+    document.getElementById('durationUnit').textContent = roomType === 'daily' ? '天' : '小时';
+    
+    // 计算初始总价
+    calculateTotalPrice();
     
     // 显示模态框
     const modal = new bootstrap.Modal(document.getElementById('quickCheckInModal'));
@@ -452,12 +452,6 @@ function showQuickCheckIn(roomNumber, roomType, price) {
 function submitQuickCheckIn() {
     const form = document.getElementById('quickCheckInForm');
     
-    // 表单验证
-    if (!form.checkValidity()) {
-        alert('请填写完整所有必填信息');
-        return;
-    }
-    
     // 收集表单数据
     const formData = {
         guest_name: form.querySelector('[name="guest_name"]').value.trim(),
@@ -467,6 +461,7 @@ function submitQuickCheckIn() {
         room_type: document.getElementById('quickRoomType').value,
         price: document.getElementById('quickRoomPrice').value,
         duration: form.querySelector('[name="duration"]').value,
+        deposit: form.querySelector('[name="deposit"]').value,
         total_price: form.querySelector('[name="total_price"]').value
     };
     
@@ -482,7 +477,7 @@ function submitQuickCheckIn() {
     .then(data => {
         if (data.success) {
             alert('入住登记成功！');
-            window.location.reload(); // 刷新页面更新房态
+            window.location.reload();
         } else {
             alert('入住登记失败：' + data.error);
         }

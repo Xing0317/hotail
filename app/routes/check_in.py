@@ -22,17 +22,13 @@ def create_check_in():
     """创建入住记录"""
     db = DatabaseManager()
     try:
-        # 获取并验证请求数据
-        try:
-            data = request.get_json()
-        except Exception:
-            return jsonify({"success": False, "error": "无效的请求数据格式"})
-        
+        data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "缺少请求数据"})
         
         # 检查必要字段
-        required_fields = ['guest_name', 'phone', 'id_card', 'room_number', 'room_type', 'price', 'duration']
+        required_fields = ['guest_name', 'phone', 'id_card', 'room_number', 
+                         'room_type', 'price', 'duration', 'deposit']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({"success": False, "error": f"缺少必要字段: {field}"})
@@ -64,22 +60,16 @@ def create_check_in():
             room_type=data['room_type'],
             price_per_unit=data['price'],
             duration=duration,
+            deposit=data['deposit'],
             total_price=total_price,
             check_out_time=check_out_time
         )
         
-        # 提交事务
         db.conn.commit()
         return jsonify({"success": True, "check_in_id": check_in_id})
-    except ValueError as e:
-        db.conn.rollback()
-        return jsonify({"success": False, "error": str(e)})
     except Exception as e:
         db.conn.rollback()
-        import traceback
-        print(f"入住登记错误: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({"success": False, "error": "系统错误，请联系管理员"})
+        return jsonify({"success": False, "error": str(e)})
     finally:
         db.close()
 
@@ -105,6 +95,25 @@ def check_out(check_in_id):
     db = DatabaseManager()
     try:
         db.process_check_out(check_in_id)
+        db.conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.conn.rollback()
+        return jsonify({"success": False, "error": str(e)})
+    finally:
+        db.close()
+
+@check_in_bp.route('/api/check-in/<int:check_in_id>/refund', methods=['POST'])
+def refund_check_in(check_in_id):
+    """处理押金退款"""
+    db = DatabaseManager()
+    try:
+        cursor = db.conn.cursor()
+        cursor.execute('''
+        UPDATE check_ins 
+        SET deposit_returned = 1 
+        WHERE check_in_id = ?
+        ''', (check_in_id,))
         db.conn.commit()
         return jsonify({"success": True})
     except Exception as e:
